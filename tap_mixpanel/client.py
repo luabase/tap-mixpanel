@@ -98,6 +98,7 @@ class MixpanelClient(object):
                  username,
                  password,
                  project_id,
+                 is_eu_data_residency,
                  user_agent=None):
         self.__api_secret = api_secret
         self.username = username
@@ -107,6 +108,7 @@ class MixpanelClient(object):
         self.__verified = False
         self.disable_engage_endpoint = False
         self.project_id = project_id
+        self.is_eu_data_residency = is_eu_data_residency
         self.basic_auth = False
 
     def __enter__(self):
@@ -116,12 +118,31 @@ class MixpanelClient(object):
     def __exit__(self, exception_type, exception_value, traceback):
         self.__session.close()
 
+    def translate_url(self, url):
+        # EU Data Residency has different API endpoints.
+        # See https://docs.mixpanel.com/docs/privacy/eu-residency
 
+        if not self.is_eu_data_residency:
+            return url
+
+        replacements = {
+            "api.mixpanel.com": "api-eu.mixpanel.com",
+            "data.mixpanel.com/api": "data-eu.mixpanel.com/api",
+            "mixpanel.com/api": "eu.mixpanel.com/api",
+        }
+
+        for standard, eu in replacements.items():
+            if standard in url:
+                return url.replace(standard, eu)
+
+        return url # fallback if no replacements are found
+ 
     @backoff.on_exception(backoff.expo,
                           (Server5xxError, MixpanelRateLimitsError, ReadTimeoutError, ConnectionError),
                           max_tries=5,
                           factor=2)
     def check_access(self):
+        LOGGER.info('EU Data Residency: {}'.format(self.is_eu_data_residency))
         basic_auth = self.basic_auth
         if self.username and self.password:
             basic_auth = True  
@@ -131,9 +152,9 @@ class MixpanelClient(object):
         headers = {}
         # Endpoint: simple API call to return a single record (org settings) to test access
         if basic_auth:
-            url = "https://mixpanel.com/api/app/me"
+            url = self.translate_url("https://mixpanel.com/api/app/me")
         else:    
-            url = 'https://mixpanel.com/api/2.0/engage'
+            url = self.translate_url('https://mixpanel.com/api/2.0/engage')
         LOGGER.info('Checking access by calling {}'.format(url))
         if self.__user_agent:
             headers['User-Agent'] = self.__user_agent
@@ -207,9 +228,9 @@ class MixpanelClient(object):
             self.__verified = self.check_access()
 
         if url and path:
-            url = '{}/{}'.format(url, path)
+            url = self.translate_url('{}/{}'.format(url, path))
         elif path and not url:
-            url = 'https://mixpanel.com/api/2.0/{}'.format(path)
+            url = self.translate_url('https://mixpanel.com/api/2.0/{}'.format(path))
 
         if 'endpoint' in kwargs:
             endpoint = kwargs['endpoint']
@@ -257,9 +278,9 @@ class MixpanelClient(object):
             self.__verified = self.check_access()
 
         if url and path:
-            url = '{}/{}'.format(url, path)
+            url = self.translate_url('{}/{}'.format(url, path))
         elif path and not url:
-            url = 'https://data.mixpanel.com/api/2.0/{}'.format(path)
+            url = self.translate_url('https://data.mixpanel.com/api/2.0/{}'.format(path))
 
         if 'endpoint' in kwargs:
             endpoint = kwargs['endpoint']

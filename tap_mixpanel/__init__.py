@@ -55,12 +55,17 @@ def main():
          params.update({"username":None,"password":None,"project_id":None})  
     else:
         raise Exception("No API secret OR Username/Password provided.")
-          
+
+    if parsed_args.config.get("is_eu_data_residency") is None:
+        parsed_args.config.update({"is_eu_data_residency":False})
+
     with MixpanelClient(parsed_args.config['api_secret'],
                         parsed_args.config['username'],
                         parsed_args.config['password'],
                         parsed_args.config['project_id'],
-                        parsed_args.config['user_agent']) as client:
+                        parsed_args.config['is_eu_data_residency'],
+                        parsed_args.config['user_agent']
+                        ) as client:
 
         state = {}
         if parsed_args.state:
