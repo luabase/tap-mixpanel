@@ -56,14 +56,22 @@ def main():
     else:
         raise Exception("No API secret OR Username/Password provided.")
 
-    if parsed_args.config.get("is_eu_data_residency") is None:
-        parsed_args.config.update({"is_eu_data_residency":False})
+    is_eu_data_residency = False
+    if parsed_args.config['is_eu_data_residency'] is None:
+        is_eu_data_residency = False
+    elif parsed_args.config['is_eu_data_residency'].lower() in ('true', '1', 't', 'y', 'yes'):
+        is_eu_data_residency = True
+    elif parsed_args.config['is_eu_data_residency'].lower() in ('false', '0', 'f', 'n', 'no'):
+        is_eu_data_residency = False
+    else:
+        raise Exception("Unable to parse boolean parameter for is_eu_data_residency:"
+                        f" {parsed_args.config['is_eu_data_residency']}")
 
     with MixpanelClient(parsed_args.config['api_secret'],
                         parsed_args.config['username'],
                         parsed_args.config['password'],
                         parsed_args.config['project_id'],
-                        parsed_args.config['is_eu_data_residency'],
+                        is_eu_data_residency,
                         parsed_args.config['user_agent']
                         ) as client:
 
